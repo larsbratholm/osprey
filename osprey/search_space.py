@@ -176,11 +176,11 @@ class IntVariable(namedtuple('IntVariable', ('name', 'min', 'max', 'warp'))):
 
     def point_from_gp(self, gpvalue):
         if self.warp is None:
-            return int(self.min + (gpvalue * (self.max - self.min)))
+            return int(np.floor(min(self.min + gpvalue * (self.max - self.min + 1), self.max)))
         elif self.warp == 'log':
-            rng = np.log(self.max) - np.log(self.min)
+            rng = np.log(self.max+1) - np.log(self.min)
             outvalue = np.exp(np.log(self.min) + gpvalue * rng)
-            return np.clip(outvalue, self.min, self.max).astype(int)
+            return int(np.clip(outvalue, self.min, self.max))
         raise ValueError('unknown warp: %s' % self.warp)
 
 
@@ -255,4 +255,11 @@ class EnumVariable(namedtuple('EnumVariable', ('name', 'choices'))):
         return float(index) / max(len(self.choices) - 1, 1)
 
     def point_from_gp(self, gpvalue):
-        return self.choices[int(np.round(gpvalue * max(len(self.choices) - 1, 1)))]
+        # hack to get the case where there's only a single choice.
+        try:
+            return self.choices[int(np.round(gpvalue * max(len(self.choices) - 1, 1)))]
+        except IndexError:
+            print('!!! len choices: ',len(self.choices))
+            print('!!! gpvalue: ', gpvalue)
+            print('!!! rounded choice: ', np.round(gpvalue * max(len(self.choices) - 1, 1)))
+            return self.choices[0]

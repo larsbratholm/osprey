@@ -29,6 +29,12 @@ except:
     pass
 from .search_space import EnumVariable
 
+try:
+    from SALib.sample import sobol_sequence as ss
+except:
+    ss = None
+    pass
+
 DEFAULT_TIMEOUT = socket._GLOBAL_DEFAULT_TIMEOUT
 
 
@@ -77,6 +83,50 @@ class BaseStrategy(object):
             return False
 
 
+class SobolSearch(BaseStrategy):
+    short_name = 'sobol'
+    _SKIP = int(1e4)
+
+    def __init__(self, length=1000):
+        #TODO length should be n_trials.  But this doesn't seem to be accessible to strategies without major re-write.
+        self.sequence = None
+        self.length = length
+        self.n_dims = 0
+        self.offset = 0
+        self.counter = 0
+
+    def _set_sequence(self):
+        #TODO could get rid of first part of sequence
+        self.sequence = ss.sample(self.length + self._SKIP, self.n_dims)
+
+    def _from_unit_cube(self, result, searchspace):
+        # TODO this should be a method common to both Sobol and GP.
+        # Note that Sobol only deals with float-valued variables, so we have
+        # a transform step on either side, where int and enum valued variables
+        # are transformed before calling gp, and then the result suggested by
+        # Sobol needs to be reverse-transformed.
+        out = {}
+        for gpvalue, var in zip(result, searchspace):
+            out[var.name] = var.point_from_gp(float(gpvalue))
+        return out
+
+    def suggest(self, history, searchspace):
+        if 'SALib' not in sys.modules:
+            raise ImportError('No module named SALib')
+
+        if self.sequence is None:
+            self.n_dims = searchspace.n_dims
+            self.offset = len(history) + self._SKIP
+            self._set_sequence()
+        try:
+            points = self.sequence[self.offset+ self.counter]
+            self.counter += 1
+        except IndexError:
+            raise RuntimeError('Increase sobol sequence length')
+
+        return self._from_unit_cube(points, searchspace)
+
+
 class RandomSearch(BaseStrategy):
     short_name = 'random'
 
@@ -92,8 +142,10 @@ class RandomSearch(BaseStrategy):
 class HyperoptTPE(BaseStrategy):
     short_name = 'hyperopt_tpe'
 
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, gamma=0.25, seeds=20):
         self.seed = seed
+        self.gamma = gamma
+        self.seeds = seeds
 
     def suggest(self, history, searchspace):
         """
@@ -175,18 +227,23 @@ class HyperoptTPE(BaseStrategy):
         trials.refresh()
         chosen_params_container = []
 
+        def suggest(*args, **kwargs):
+            return tpe.suggest(*args, **kwargs, gamma=self.gamma, n_startup_jobs=self.seeds)
+
         def mock_fn(x):
             # http://stackoverflow.com/a/3190783/1079728
             # to get around no nonlocal keywork in python2
             chosen_params_container.append(x)
             return 0
 
-        fmin(fn=mock_fn, algo=tpe.suggest, space=hp_searchspace, trials=trials,
+        fmin(fn=mock_fn, algo=suggest, space=hp_searchspace, trials=trials,
              max_evals=len(trials.trials)+1,
              **self._hyperopt_fmin_random_kwarg(random))
         chosen_params = chosen_params_container[0]
 
         return chosen_params
+
+
 
     @staticmethod
     def _hyperopt_fmin_random_kwarg(random):
@@ -202,33 +259,59 @@ class HyperoptTPE(BaseStrategy):
 class GP(BaseStrategy):
     short_name = 'gp'
 
-    def __init__(self, acquisition=None, seed=None, seeds=1, max_feval=5E4, max_iter=1E5):
+    def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, max_feval=5E4, max_iter=1E5):
         self.seed = seed
         self.seeds = seeds
         self.max_feval = max_feval
         self.max_iter = max_iter
+        self.n_iter = n_iter
         self.model = None
         self.n_dims = None
         self.kernel = None
-        self._kerns = None
-        self._kernf = None
-        self._kernb = None
+        if kernels is None:
+            kernels = [{'name': 'GPy.kern.Matern52', 'params': {'ARD': True},
+                        'options': {'independent': False}}]
+        self._kerns = kernels
         if acquisition is None:
             acquisition = {'name': 'osprey', 'params': {}}
         self.acquisition_function = acquisition
         self._acquisition_function = None
         self._set_acquisition()
 
-    def _create_kernel(self, V):
-        self._kerns = [RBF(1, ARD=True, active_dims=[i])
-                       for i in range(self.n_dims)]
-        self._kernf = Fixed(self.n_dims, tdot(V))
-        self._kernb = Bias(self.n_dims)
-        self.kernel = np.sum(self._kerns) + self._kernf + self._kernb
+    def _create_kernel(self):
+        # Check kernels
+        kernels = self._kerns
+        if not isinstance(kernels, list):
+            raise RuntimeError('Must provide enumeration of kernels')
+        for kernel in kernels:
+            if sorted(list(kernel.keys())) != ['name', 'options', 'params']:
+                raise RuntimeError(
+                    'strategy/params/kernels must contain keys: "name", "options", "params"')
+
+        # Turn into entry points.
+        # TODO use eval to allow user to specify internal variables for kernels (e.g. V) in config file.
+        kernels = []
+        for kern in self._kerns:
+            params = kern['params']
+            options = kern['options']
+            name = kern['name']
+            kernel_ep = load_entry_point(name, 'strategy/params/kernels')
+            if issubclass(kernel_ep, KERNEL_BASE_CLASS):
+                if options['independent']:
+                    #TODO Catch errors here?  Estimator entry points don't catch instantiation errors
+                    kernel = np.sum([kernel_ep(1, active_dims=[i], **params) for i in range(self.n_dims)])
+                else:
+                    kernel = kernel_ep(self.n_dims, **params)
+            if not isinstance(kernel, KERNEL_BASE_CLASS):
+                raise RuntimeError('strategy/params/kernel must load a'
+                                   'GPy derived Kernel')
+            kernels.append(kernel)
+        self.kernel = np.sum(kernels)
 
     def _fit_model(self, X, Y):
         model = GPRegression(X, Y, self.kernel)
-        model.optimize(messages=False, max_f_eval=self.max_feval)
+        model.optimize_restarts(num_restarts=20, verbose=False)
+        # model.optimize(messages=False, max_f_eval=self.max_feval)
         self.model = model
 
     def _get_random_point(self):
@@ -258,15 +341,15 @@ class GP(BaseStrategy):
         return (y_mean+y_var).flatten()
 
     def _optimize(self, init=None):
-        # TODO start minimization from a range of points and take minimum
         if not init:
+            # TODO make this get sobol points?
             init = self._get_random_point()
 
+        # Objective function
         def z(x):
             # TODO make spread of points around x and take mean value.
             x = x.copy().reshape(-1, self.n_dims)
-            y_mean, y_var = self.model.predict(x, kern=(np.sum(self._kerns).copy() +
-                                                        self._kernb.copy()))
+            y_mean, y_var = self.model.predict(x)
             # This code is for debug/testing phase only.
             # Ideally we should test for negative variance regardless of the AF.
             # However, we want to recover the original functionality of Osprey, hence the conditional block.
@@ -279,9 +362,22 @@ class GP(BaseStrategy):
                     af = self._acquisition_function(x, y_mean=y_mean, y_var=y_var)
             return (-1)*af
 
-        res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                        options={'maxiter': self.max_iter, 'disp': 0})
-        return res.x
+        # Optimization loop
+        acquisition_fns = []
+        candidates = []
+        for i in range(self.n_iter):
+            init = self._get_random_point()
+            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                            options={'maxiter': self.max_iter, 'disp': 0})
+            candidates.append(res.x)
+            acquisition_fns.append(res.fun)
+
+        # Choose the best
+        acquisition_fns = np.array(acquisition_fns).flatten()
+        candidates = np.array(candidates)
+        best_index = int(np.argmin(acquisition_fns))
+        best_candidate = candidates[best_index]
+        return best_candidate
 
     def _set_acquisition(self):
         if isinstance(self.acquisition_function, list):
@@ -357,9 +453,8 @@ class GP(BaseStrategy):
         self.n_dims = searchspace.n_dims
 
         X, Y, V, ignore = self._get_data(history, searchspace)
-
         # TODO make _create_kernel accept optional args.
-        self._create_kernel(V)
+        self._create_kernel()
         self._fit_model(X, Y)
         suggestion = self._optimize()
 

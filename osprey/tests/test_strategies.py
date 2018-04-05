@@ -102,7 +102,7 @@ def test_1():
 
     np.testing.assert_array_equal(ref, ours)
 
-
+# TODO this error message needs changing.
 @skipif('GPy' not in sys.modules, 'this test requires hyperopt')
 def test_gp():
     searchspace = SearchSpace()
@@ -113,6 +113,7 @@ def test_gp():
 
     history = [(searchspace.rvs(), np.random.random(), 'SUCCEEDED')
                for _ in range(4)]
+
     params = GP().suggest(history, searchspace)
     for k, v in iteritems(params):
         assert k in searchspace.variables

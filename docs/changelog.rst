@@ -21,6 +21,7 @@ New Features
   tested in the history. 
 + Added ``n_jobs`` flag for ``osprey worker`` to control how many threads are
   used for cross-validation.
++ Added ability to specifiy arbitrary kernels for gaussian process strategy.
 + Added the ability to specify three different acquisition functions for the gaussian processes strategy: expected
 improvement `ei`, upper confidence bound, `ucb` and the original Osprey function (the default), `osprey`.
 
@@ -30,6 +31,7 @@ Bug Fixes
 + Fixed issue that was causing crashes when there was an attempt to write estimator parameters (e.g. numpy arrays) which
 couldn't be serialized by JSON.
 + Fixed crashes when using ``jump`` variables of type ``int``.
++ Fixed error in the way integer variables were selected from results of Gaussian processes search strategy.
 
 
 v1.1.0

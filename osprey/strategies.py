@@ -259,12 +259,15 @@ class HyperoptTPE(BaseStrategy):
 class GP(BaseStrategy):
     short_name = 'gp'
 
-    def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, max_feval=5E4, max_iter=1E5):
+    def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, 
+            n_init = 20, sobol_init = False, max_feval=5E4, max_iter=1E5):
         self.seed = seed
         self.seeds = seeds
         self.max_feval = max_feval
         self.max_iter = max_iter
         self.n_iter = n_iter
+        self.n_init = n_init
+        self.sobol_init = sobol_init
         self.model = None
         self.n_dims = None
         self.kernel = None
@@ -314,9 +317,16 @@ class GP(BaseStrategy):
         # model.optimize(messages=False, max_f_eval=self.max_feval)
         self.model = model
 
-    def _get_random_point(self):
-        return np.array([np.random.uniform(low=0., high=1.)
-                         for i in range(self.n_dims)])
+    def _get_init(self):
+        if self.sobol_init:
+            return self._get_sobol_points()
+        return self._get_random_points()
+
+    def _get_random_points(self):
+        return np.random.random((self.n_iter, self.n_dims))
+
+    def _get_sobol_points(self):
+        return ss.sample(self.n_iter + np.random.randint(1000), self.n_dims)[-self.n_iter:]
 
     def _is_var_positive(self, var):
 
@@ -341,43 +351,46 @@ class GP(BaseStrategy):
         return (y_mean+y_var).flatten()
 
     def _optimize(self, init=None):
-        if not init:
-            # TODO make this get sobol points?
-            init = self._get_random_point()
-
         # Objective function
         def z(x):
             # TODO make spread of points around x and take mean value.
-            x = x.copy().reshape(-1, self.n_dims)
-            y_mean, y_var = self.model.predict(x)
+            X = x.reshape(-1, self.n_dims)
+            y_mean, y_var = self.model.predict(X)
             # This code is for debug/testing phase only.
             # Ideally we should test for negative variance regardless of the AF.
             # However, we want to recover the original functionality of Osprey, hence the conditional block.
             # TODO remove this.
             if self.acquisition_function['name'] == 'osprey':
-                af = self._acquisition_function(x, y_mean=y_mean, y_var=y_var)
+                af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
             elif self.acquisition_function['name'] in ['ei', 'ucb']:
                 # y_var = np.abs(y_var)
                 if self._is_var_positive(y_var):
-                    af = self._acquisition_function(x, y_mean=y_mean, y_var=y_var)
+                    af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
             return (-1)*af
 
-        # Optimization loop
-        acquisition_fns = []
-        candidates = []
-        for i in range(self.n_iter):
-            init = self._get_random_point()
-            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                            options={'maxiter': self.max_iter, 'disp': 0})
-            candidates.append(res.x)
-            acquisition_fns.append(res.fun)
+        if init == None:
+            init_tries = self._get_init()
 
-        # Choose the best
-        acquisition_fns = np.array(acquisition_fns).flatten()
-        candidates = np.array(candidates)
-        best_index = int(np.argmin(acquisition_fns))
-        best_candidate = candidates[best_index]
-        return best_candidate
+            # Optimization loop
+            acquisition_fns = []
+            candidates = []
+            for i in range(self.n_iter):
+                init = init_tries[i]
+                res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                                options={'maxiter': self.max_iter, 'disp': 0})
+                candidates.append(res.x)
+                acquisition_fns.append(res.fun)
+
+            # Choose the best
+            acquisition_fns = np.array(acquisition_fns).flatten()
+            candidates = np.array(candidates)
+            best_index = int(np.argmin(acquisition_fns))
+            best_candidate = candidates[best_index]
+            return best_candidate
+
+        res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                        options={'maxiter': self.max_iter, 'disp': 0})
+        return res.x
 
     def _set_acquisition(self):
         if isinstance(self.acquisition_function, list):

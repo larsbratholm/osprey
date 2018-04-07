@@ -313,7 +313,7 @@ class GP(BaseStrategy):
 
     def _fit_model(self, X, Y):
         model = GPRegression(X, Y, self.kernel)
-        model.optimize_restarts(num_restarts=20, verbose=False)
+        model.optimize_restarts(num_restarts=self.n_init, verbose=False)
         # model.optimize(messages=False, max_f_eval=self.max_feval)
         self.model = model
 

@@ -6,6 +6,7 @@ import socket
 import numpy as np
 from sklearn.utils import check_random_state
 from sklearn.grid_search import ParameterGrid
+import math
 try:
     from hyperopt import (Trials, tpe, fmin, STATUS_OK, STATUS_RUNNING,
                           STATUS_FAIL)
@@ -341,6 +342,16 @@ class GP(BaseStrategy):
         y_best = self.model.Y.max(axis=0)
         z = (y_mean - y_best)/y_std
         result = y_std*(z*norm.cdf(z) + norm.pdf(z))
+        return result
+
+    def _lars(self, x, y_mean, y_var):
+        # The probability of y_mean being
+        # greater than y_best, assuming normal
+        y_std = np.sqrt(y_var)
+        y_best = self.model.Y.max(axis=0)
+        z = (y_mean - y_best)/y_std
+
+        result = math.erf(z/sqrt(2))
         return result
 
     def _ucb(self, x, y_mean, y_var, kappa=1.0):

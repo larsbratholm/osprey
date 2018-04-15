@@ -513,7 +513,7 @@ class GP(BaseStrategy):
         self._fit_model(X, Y)
         if self.optimize_best:
             x_best, y_best = self.get_gp_best()
-            self.y_best = self._back_transform(y_best)
+            self.y_best = self._back_transform_score(y_best)
             self.x_best = self._from_gp(x_best, searchspace)
         else:
             best_idx = self.model.Y.argmax(axis=0)

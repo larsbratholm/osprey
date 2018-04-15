@@ -341,8 +341,7 @@ class GP(BaseStrategy):
 
     def _ei(self, x, y_mean, y_var):
         y_std = np.sqrt(y_var)
-        y_best = self.model.Y.max(axis=0)
-        z = (y_mean - y_best)/y_std
+        z = (y_mean - self.y_best)/y_std
         result = y_std*(z*norm.cdf(z) + norm.pdf(z))
         return result
 
@@ -376,6 +375,8 @@ class GP(BaseStrategy):
 
         res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
                         options={'maxiter': self.max_iter, 'disp': 0})
+
+        print("lol", self.model.X[self.model.Y.argmax(axis=0)], res.x)
 
         return res.x, -res.fun.flatten()[0]
 

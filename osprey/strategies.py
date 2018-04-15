@@ -369,9 +369,9 @@ class GP(BaseStrategy):
             X = x.reshape(-1, self.n_dims)
             y_mean, y_var = self.model.predict(X)
 
-            return -y_mean
+            return y_mean
 
-        best_observation = self.model.X[self.model.Y.argmax(axis=0)]
+        best_observation = self.model.X[self.model.Y.argmax(axis=0)].flatten()
 
         res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
                         options={'maxiter': self.max_iter, 'disp': 0})

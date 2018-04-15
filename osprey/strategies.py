@@ -518,7 +518,8 @@ class GP(BaseStrategy):
         else:
             best_idx = self.model.Y.argmax(axis=0)
             self.x_best = self.model.X[best_idx].flatten()
-            self.y_best = self.model.Y[best_idx].flatten()[0]
+            y_best = self.model.Y[best_idx].flatten()[0]
+            self.y_best = self._back_transform_score(y_best)
 
         suggestion = self._optimize_acquisition()
 

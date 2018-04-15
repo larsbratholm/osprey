@@ -275,6 +275,7 @@ class GP(BaseStrategy):
         self.kernel = None
         self.x_best = None
         self.y_best = None
+        self.transformed = False
         if kernels is None:
             kernels = [{'name': 'GPy.kern.Matern52', 'params': {'ARD': True},
                         'options': {'independent': False}}]
@@ -316,10 +317,27 @@ class GP(BaseStrategy):
         self.kernel = np.sum(kernels)
 
     def _fit_model(self, X, Y):
-        model = GPRegression(X, Y, self.kernel)
+        if max(y) < 0:
+            self.transformed = True
+        else:
+            self.transformed = False
+
+        Y_trans = self._transform_score(Y)
+
+        model = GPRegression(X, Y_trans, self.kernel)
         model.optimize_restarts(num_restarts=self.n_init, verbose=False)
         # model.optimize(messages=False, max_f_eval=self.max_feval)
         self.model = model
+
+    def _transform_score(self, Y):
+        if self.transformed:
+            return -np.log(-Y)
+        return Y
+
+    def _back_transform_score(self, Y):
+        if self.transformed:
+            return - np.exp(-Y)
+        return Y
 
     def _get_init(self):
         if self.sobol_init:
@@ -342,7 +360,7 @@ class GP(BaseStrategy):
 
     def _ei(self, x, y_mean, y_var):
         y_std = np.sqrt(y_var)
-        z = (y_mean - self.y_best)/y_std
+        z = (y_mean - self._transform_score(self.y_best))/y_std
         result = y_std*(z*norm.cdf(z) + norm.pdf(z))
         return result
 
@@ -351,16 +369,16 @@ class GP(BaseStrategy):
         # greater than y_best, assuming normal
         y_std = np.sqrt(y_var)
 
-        z = (y_mean - self.y_best)/y_std
+        z = (y_mean - self._transform_score(self.y_best))/y_std
 
         result = math.erf(z/np.sqrt(2))
         return result
 
-    def _ucb(self, y_mean, y_var, kappa=1.0):
+    def _ucb(self, x, y_mean, y_var, kappa=1.0):
         result = y_mean + kappa*np.sqrt(y_var)
         return result
 
-    def _osprey(self, y_mean, y_var):
+    def _osprey(self, x, y_mean, y_var):
         return (y_mean+y_var).flatten()
 
     def get_gp_best(self):
@@ -494,7 +512,8 @@ class GP(BaseStrategy):
         self._create_kernel()
         self._fit_model(X, Y)
         if self.optimize_best:
-            x_best, self.y_best = self.get_gp_best()
+            x_best, y_best = self.get_gp_best()
+            self.y_best = self._back_transform(y_best)
             self.x_best = self._from_gp(x_best, searchspace)
         else:
             best_idx = self.model.Y.argmax(axis=0)

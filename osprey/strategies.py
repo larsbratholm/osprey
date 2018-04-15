@@ -369,16 +369,30 @@ class GP(BaseStrategy):
             X = x.reshape(-1, self.n_dims)
             y_mean, y_var = self.model.predict(X)
 
-            return y_mean
+            return -y_mean
 
-        best_observation = self.model.X[self.model.Y.argmax(axis=0)].flatten()
-
-        res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
+        # Optimization loop
+        init_tries = self._get_init()
+        acquisition_fns = []
+        candidates = []
+        for i in range(self.n_iter):
+            init = init_tries[i]
+            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                            options={'maxiter': self.max_iter, 'disp': 0})
+            candidates.append(res.x)
+            acquisition_fns.append(res.fun)
+        init = self.model.X[self.model.Y.argmax(axis=0)].flatten()
+        res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
                         options={'maxiter': self.max_iter, 'disp': 0})
+        candidates.append(res.x)
+        acquisition_fns.append(res.fun)
 
-        print("lol", self.model.X[self.model.Y.argmax(axis=0)], res.x)
-
-        return res.x, -res.fun.flatten()[0]
+        # Choose the best
+        acquisition_fns = np.array(acquisition_fns).flatten()
+        candidates = np.array(candidates)
+        best_index = int(np.argmin(acquisition_fns))
+        best_candidate = candidates[best_index]
+        return best_candidate, - np.min(acquisition_fns)
 
     def _optimize_acquisition(self):
         # Objective function

@@ -265,11 +265,11 @@ class GP(BaseStrategy):
         self.seed = seed
         self.seeds = seeds
         self.max_feval = max_feval
-        self.max_iter = max_iter
-        self.n_iter = n_iter
-        self.n_init = n_init
-        self.sobol_init = sobol_init
-        self.optimize_best = optimize_best
+        self.max_iter = int(max_iter)
+        self.n_iter = int(n_iter)
+        self.n_init = int(n_init)
+        self.sobol_init = bool(sobol_init)
+        self.optimize_best = bool(optimize_best)
         self.model = None
         self.n_dims = None
         self.kernel = None
@@ -317,7 +317,7 @@ class GP(BaseStrategy):
         self.kernel = np.sum(kernels)
 
     def _fit_model(self, X, Y):
-        if max(y) < 0:
+        if max(Y) < 0:
             self.transformed = True
         else:
             self.transformed = False

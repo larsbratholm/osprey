@@ -368,6 +368,7 @@ class GP(BaseStrategy):
             # TODO make spread of points around x and take mean value.
             X = x.reshape(-1, self.n_dims)
             y_mean, y_var = self.model.predict(X)
+            print(y_mean, X)
 
             return -y_mean
 

@@ -272,6 +272,8 @@ class GP(BaseStrategy):
         self.model = None
         self.n_dims = None
         self.kernel = None
+        self.x_best = None
+        self.y_best = None
         if kernels is None:
             kernels = [{'name': 'GPy.kern.Matern52', 'params': {'ARD': True},
                         'options': {'independent': False}}]
@@ -348,22 +350,36 @@ class GP(BaseStrategy):
         # The probability of y_mean being
         # greater than y_best, assuming normal
         y_std = np.sqrt(y_var)
-        idx = self.model.Y.argmax(axis=0)
-        x_best = x[idx]
-        x_opt, y_opt = self._optimize(x_best)
-        z = (y_mean - y_opt)/y_std
 
-        result = math.erf(z/sqrt(2))
+        z = (y_mean - self.y_best)/y_std
+
+        result = math.erf(z/np.sqrt(2))
         return result
 
-    def _ucb(self, x, y_mean, y_var, kappa=1.0):
+    def _ucb(self, y_mean, y_var, kappa=1.0):
         result = y_mean + kappa*np.sqrt(y_var)
         return result
 
-    def _osprey(self, x, y_mean, y_var):
+    def _osprey(self, y_mean, y_var):
         return (y_mean+y_var).flatten()
 
-    def _optimize(self, init=None):
+    def get_gp_best(self):
+        # Objective function
+        def z(x):
+            # TODO make spread of points around x and take mean value.
+            X = x.reshape(-1, self.n_dims)
+            y_mean, y_var = self.model.predict(X)
+
+            return -y_mean
+
+        best_observation = self.model.X[self.model.Y.argmax(axis=0)]
+
+        res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
+                        options={'maxiter': self.max_iter, 'disp': 0})
+
+        return res.x, -res.fun.flatten()[0]
+
+    def _optimize_acquisition(self):
         # Objective function
         def z(x):
             # TODO make spread of points around x and take mean value.
@@ -381,29 +397,24 @@ class GP(BaseStrategy):
                     af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
             return (-1)*af
 
-        if init == None:
-            init_tries = self._get_init()
+        init_tries = self._get_init()
 
-            # Optimization loop
-            acquisition_fns = []
-            candidates = []
-            for i in range(self.n_iter):
-                init = init_tries[i]
-                res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                                options={'maxiter': self.max_iter, 'disp': 0})
-                candidates.append(res.x)
-                acquisition_fns.append(res.fun)
+        # Optimization loop
+        acquisition_fns = []
+        candidates = []
+        for i in range(self.n_iter):
+            init = init_tries[i]
+            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                            options={'maxiter': self.max_iter, 'disp': 0})
+            candidates.append(res.x)
+            acquisition_fns.append(res.fun)
 
-            # Choose the best
-            acquisition_fns = np.array(acquisition_fns).flatten()
-            candidates = np.array(candidates)
-            best_index = int(np.argmin(acquisition_fns))
-            best_candidate = candidates[best_index]
-            return best_candidate
-
-        res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                        options={'maxiter': self.max_iter, 'disp': 0})
-        return res.x, res.fun
+        # Choose the best
+        acquisition_fns = np.array(acquisition_fns).flatten()
+        candidates = np.array(candidates)
+        best_index = int(np.argmin(acquisition_fns))
+        best_candidate = candidates[best_index]
+        return best_candidate
 
     def _set_acquisition(self):
         if isinstance(self.acquisition_function, list):
@@ -482,7 +493,9 @@ class GP(BaseStrategy):
         # TODO make _create_kernel accept optional args.
         self._create_kernel()
         self._fit_model(X, Y)
-        suggestion = self._optimize()
+        x_best, self.y_best = self.get_gp_best()
+        self.x_best = self._from_gp(x_best, searchspace)
+        suggestion = self._optimize_acquisition()
 
         if suggestion in ignore or self._is_within(suggestion, X):
             return RandomSearch().suggest(history, searchspace)

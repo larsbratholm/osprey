@@ -122,6 +122,8 @@ def initialize_trial(strategy, searchspace, estimator, config_sha1,
                    if t.project_name == project_name]
 
         print('History contains: %d trials' % len(history))
+        if strategy.short_name == 'gp' and strategy.y_best != None:
+            print('Best fitted score %.3f with input: %s' % (strategy.y_best, strategy.x_best))
         print('Choosing next hyperparameters with %s...' % strategy.short_name)
         start = time.time()
 

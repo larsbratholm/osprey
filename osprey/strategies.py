@@ -373,7 +373,7 @@ class GP(BaseStrategy):
             # TODO remove this.
             if self.acquisition_function['name'] == 'osprey':
                 af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
-            elif self.acquisition_function['name'] in ['ei', 'ucb']:
+            elif self.acquisition_function['name'] in ['ei', 'ucb', 'lars']:
                 # y_var = np.abs(y_var)
                 if self._is_var_positive(y_var):
                     af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
@@ -409,9 +409,9 @@ class GP(BaseStrategy):
         if sorted(self.acquisition_function.keys()) != ['name', 'params']:
             raise RuntimeError('strategy/params/acquisition must contain keys '
                                '"name" and "params"')
-        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey']:
+        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey', 'lars']:
             raise RuntimeError('strategy/params/acquisition name must be one of '
-                               '"ei", "ucb", "osprey"')
+                               '"ei", "ucb", "osprey", "lars"')
 
         f = eval('self._'+self.acquisition_function['name'])
 

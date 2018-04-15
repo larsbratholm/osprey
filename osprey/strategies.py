@@ -348,8 +348,10 @@ class GP(BaseStrategy):
         # The probability of y_mean being
         # greater than y_best, assuming normal
         y_std = np.sqrt(y_var)
-        y_best = self.model.Y.max(axis=0)
-        z = (y_mean - y_best)/y_std
+        idx = self.model.Y.argmax(axis=0)
+        x_best = x[idx]
+        x_opt, y_opt = self._optimize(x_best)
+        z = (y_mean - y_opt)/y_std
 
         result = math.erf(z/sqrt(2))
         return result
@@ -401,7 +403,7 @@ class GP(BaseStrategy):
 
         res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
                         options={'maxiter': self.max_iter, 'disp': 0})
-        return res.x
+        return res.x, res.fun
 
     def _set_acquisition(self):
         if isinstance(self.acquisition_function, list):

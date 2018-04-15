@@ -261,7 +261,7 @@ class GP(BaseStrategy):
     short_name = 'gp'
 
     def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, 
-            n_init = 20, sobol_init = False, max_feval=5E4, max_iter=1E5):
+            n_init = 20, sobol_init = False, optimize_best = False, max_feval=5E4, max_iter=1E5):
         self.seed = seed
         self.seeds = seeds
         self.max_feval = max_feval
@@ -269,6 +269,7 @@ class GP(BaseStrategy):
         self.n_iter = n_iter
         self.n_init = n_init
         self.sobol_init = sobol_init
+        self.optimize_best = optimize_best
         self.model = None
         self.n_dims = None
         self.kernel = None
@@ -368,32 +369,15 @@ class GP(BaseStrategy):
             # TODO make spread of points around x and take mean value.
             X = x.reshape(-1, self.n_dims)
             y_mean, y_var = self.model.predict(X)
-            print(y_mean, X)
 
             return -y_mean
 
-        # Optimization loop
-        init_tries = self._get_init()
-        acquisition_fns = []
-        candidates = []
-        for i in range(self.n_iter):
-            init = init_tries[i]
-            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                            options={'maxiter': self.max_iter, 'disp': 0})
-            candidates.append(res.x)
-            acquisition_fns.append(res.fun)
-        init = self.model.X[self.model.Y.argmax(axis=0)].flatten()
-        res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                        options={'maxiter': self.max_iter, 'disp': 0})
-        candidates.append(res.x)
-        acquisition_fns.append(res.fun)
+        best_observation = self.model.X[self.model.Y.argmax(axis=0)].flatten()
 
-        # Choose the best
-        acquisition_fns = np.array(acquisition_fns).flatten()
-        candidates = np.array(candidates)
-        best_index = int(np.argmin(acquisition_fns))
-        best_candidate = candidates[best_index]
-        return best_candidate, - np.min(acquisition_fns)
+        res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
+                        options={'maxiter': self.max_iter, 'disp': 0})
+
+        return res.x, -res.fun.flatten()[0]
 
     def _optimize_acquisition(self):
         # Objective function
@@ -509,8 +493,14 @@ class GP(BaseStrategy):
         # TODO make _create_kernel accept optional args.
         self._create_kernel()
         self._fit_model(X, Y)
-        x_best, self.y_best = self.get_gp_best()
-        self.x_best = self._from_gp(x_best, searchspace)
+        if self.optimize_best:
+            x_best, self.y_best = self.get_gp_best()
+            self.x_best = self._from_gp(x_best, searchspace)
+        else:
+            best_idx = self.model.Y.argmax(axis=0)
+            self.x_best = self.model.X[best_idx].flatten()
+            self.y_best = self.model.Y[best_idx].flatten()[0]
+
         suggestion = self._optimize_acquisition()
 
         if suggestion in ignore or self._is_within(suggestion, X):

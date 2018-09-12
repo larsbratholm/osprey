@@ -407,7 +407,7 @@ class GP(BaseStrategy):
             # TODO remove this.
             if self.acquisition_function['name'] in ['osprey', 'ucb']:
                 af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
-            else::
+            else:
                 if self._is_var_positive(y_var):
                     af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
                 else:

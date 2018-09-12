@@ -419,19 +419,19 @@ class GP(BaseStrategy):
 
         init_tries = self._get_init()
 
-            # Optimization loop
-            acquisition_fns = []
-            candidates = []
-            for i in range(self.n_iter):
-                init = init_tries[i]
-                if self.max_iter > 0:
-                    res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                                    options={'maxiter': self.max_iter, 'disp': 0})
-                    candidates.append(res.x)
-                    acquisition_fns.append(res.fun)
-                else:
-                    candidates.append(init)
-                    acquisition_fns.append(z(init))
+        # Optimization loop
+        acquisition_fns = []
+        candidates = []
+        for i in range(self.n_iter):
+            init = init_tries[i]
+            if self.max_iter > 0:
+                res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                                options={'maxiter': self.max_iter, 'disp': 0})
+                candidates.append(res.x)
+                acquisition_fns.append(res.fun)
+            else:
+                candidates.append(init)
+                acquisition_fns.append(z(init))
 
         # Choose the best
         acquisition_fns = np.array(acquisition_fns).flatten()

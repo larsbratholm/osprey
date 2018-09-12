@@ -411,9 +411,8 @@ class GP(BaseStrategy):
                 if self._is_var_positive(y_var):
                     af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
                 else:
-                    if self.acquisition_function['name'] == 'ei':
+                    if self.acquisition_function['name'] in ['ei', 'lars']:
                         return 0
-                    else:
 
             return (-1)*af
 

@@ -525,7 +525,7 @@ class GP(BaseStrategy):
             x_best = self.model.X[best_idx].flatten()
             #y_best = self.model.Y[best_idx].flatten()[0]
             self.x_best = self._from_gp(x_best, searchspace)
-            y_best = self.model.predict(self.x_best)
+            y_best = self.model.predict(x_best)
             self.y_best = self._back_transform_score(y_best)
 
         suggestion = self._optimize_acquisition()

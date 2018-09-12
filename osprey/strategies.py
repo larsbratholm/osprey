@@ -261,10 +261,9 @@ class GP(BaseStrategy):
     short_name = 'gp'
 
     def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, 
-            n_init = 20, sobol_init = False, optimize_best = False, max_feval=5E4, max_iter=1E5):
+            n_init = 20, sobol_init = False, optimize_best = False, max_iter=1E5):
         self.seed = seed
         self.seeds = seeds
-        self.max_feval = max_feval
         self.max_iter = int(max_iter)
         self.n_iter = int(n_iter)
         self.n_init = int(n_init)
@@ -326,7 +325,6 @@ class GP(BaseStrategy):
 
         model = GPRegression(X, Y_trans, self.kernel)
         model.optimize_restarts(num_restarts=self.n_init, verbose=False)
-        # model.optimize(messages=False, max_f_eval=self.max_feval)
         self.model = model
 
     def _transform_score(self, Y):
@@ -407,25 +405,33 @@ class GP(BaseStrategy):
             # Ideally we should test for negative variance regardless of the AF.
             # However, we want to recover the original functionality of Osprey, hence the conditional block.
             # TODO remove this.
-            if self.acquisition_function['name'] == 'osprey':
+            if self.acquisition_function['name'] in ['osprey', 'ucb']:
                 af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
-            elif self.acquisition_function['name'] in ['ei', 'ucb', 'lars']:
-                # y_var = np.abs(y_var)
+            else::
                 if self._is_var_positive(y_var):
                     af = self._acquisition_function(X, y_mean=y_mean, y_var=y_var)
+                else:
+                    if self.acquisition_function['name'] == 'ei':
+                        return 0
+                    else:
+
             return (-1)*af
 
         init_tries = self._get_init()
 
-        # Optimization loop
-        acquisition_fns = []
-        candidates = []
-        for i in range(self.n_iter):
-            init = init_tries[i]
-            res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
-                            options={'maxiter': self.max_iter, 'disp': 0})
-            candidates.append(res.x)
-            acquisition_fns.append(res.fun)
+            # Optimization loop
+            acquisition_fns = []
+            candidates = []
+            for i in range(self.n_iter):
+                init = init_tries[i]
+                if self.max_iter > 0:
+                    res = minimize(z, init, bounds=self.n_dims*[(0., 1.)],
+                                    options={'maxiter': self.max_iter, 'disp': 0})
+                    candidates.append(res.x)
+                    acquisition_fns.append(res.fun)
+                else:
+                    candidates.append(init)
+                    acquisition_fns.append(z(init))
 
         # Choose the best
         acquisition_fns = np.array(acquisition_fns).flatten()
@@ -518,8 +524,9 @@ class GP(BaseStrategy):
         else:
             best_idx = self.model.Y.argmax(axis=0)
             x_best = self.model.X[best_idx].flatten()
-            y_best = self.model.Y[best_idx].flatten()[0]
+            #y_best = self.model.Y[best_idx].flatten()[0]
             self.x_best = self._from_gp(x_best, searchspace)
+            y_best = self.model.predict(self.x_best)
             self.y_best = self._back_transform_score(y_best)
 
         suggestion = self._optimize_acquisition()

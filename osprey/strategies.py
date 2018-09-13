@@ -261,7 +261,8 @@ class GP(BaseStrategy):
     short_name = 'gp'
 
     def __init__(self, kernels=None, acquisition=None, seed=None, seeds=1, n_iter=50, 
-            n_init = 20, sobol_init = False, optimize_best = False, max_iter=1E5):
+            n_init = 20, sobol_init=False, optimize_best=False, max_iter=1E5,
+            predict_from_gp=True):
         self.seed = seed
         self.seeds = seeds
         self.max_iter = int(max_iter)
@@ -269,6 +270,7 @@ class GP(BaseStrategy):
         self.n_init = int(n_init)
         self.sobol_init = bool(sobol_init)
         self.optimize_best = bool(optimize_best)
+        self.predict_from_gp = bool(predict_from_gp)
         self.model = None
         self.n_dims = None
         self.kernel = None
@@ -513,11 +515,14 @@ class GP(BaseStrategy):
         self._fit_model(X, Y)
         if self.optimize_best:
             x_best = self.get_gp_best()
+            y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
         else:
             best_idx = self.model.Y.argmax(axis=0)
             x_best = self.model.X[best_idx].flatten()
-        #y_best = self.model.Y[best_idx].flatten()[0]
-        y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
+            if self.predict_from_gp:
+                y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
+            else:
+                y_best = self.model.Y[best_idx].flatten()[0]
         self.y_best = self._back_transform_score(y_best)
         self.x_best = self._from_gp(x_best, searchspace)
 

@@ -362,14 +362,10 @@ class GP(BaseStrategy):
         result = y_std*(z*norm.cdf(z) + norm.pdf(z))
         return result
 
-    def _lars(self, x, y_mean, y_var):
-        # The probability of y_mean being
-        # greater than y_best, assuming normal
-        y_std = np.sqrt(y_var)
-
-        z = (y_mean - self._transform_score(self.y_best))/y_std
-
-        result = math.erf(z/np.sqrt(2))
+    def _larsei(self, x, y_mean, y_var, kappa=0.01):
+        y_std = np.sqrt(y_var + self.y_best_var)
+        z = (y_mean - self._transform_score(self.y_best) - kappa)/y_std
+        result = y_std*(z*norm.cdf(z) + norm.pdf(z))
         return result
 
     def _ucb(self, x, y_mean, y_var, kappa=1.0):
@@ -393,7 +389,7 @@ class GP(BaseStrategy):
         res = minimize(z, best_observation, bounds=self.n_dims*[(0., 1.)],
                         options={'maxiter': self.max_iter, 'disp': 0})
 
-        return res.x, -res.fun.flatten()[0]
+        return res.x
 
     def _optimize_acquisition(self):
         # Objective function
@@ -444,9 +440,9 @@ class GP(BaseStrategy):
         if sorted(self.acquisition_function.keys()) != ['name', 'params']:
             raise RuntimeError('strategy/params/acquisition must contain keys '
                                '"name" and "params"')
-        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey', 'lars']:
+        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey', 'larsei']:
             raise RuntimeError('strategy/params/acquisition name must be one of '
-                               '"ei", "ucb", "osprey", "lars"')
+                               '"ei", "ucb", "osprey", "larsei"')
 
         f = eval('self._'+self.acquisition_function['name'])
 
@@ -516,15 +512,17 @@ class GP(BaseStrategy):
         self._create_kernel()
         self._fit_model(X, Y)
         if self.optimize_best:
-            x_best, y_best = self.get_gp_best()
+            x_best = self.get_gp_best()
+            y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
             self.y_best = self._back_transform_score(y_best)
             self.x_best = self._from_gp(x_best, searchspace)
         else:
             best_idx = self.model.Y.argmax(axis=0)
             x_best = self.model.X[best_idx].flatten()
             #y_best = self.model.Y[best_idx].flatten()[0]
-            y_best = self.model.predict(x_best.reshape(-1, self.n_dims))
+            y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
             self.y_best = self._back_transform_score(y_best)
+            print("test", y_best, self.model.Y[best_idx].flatten()[0])
 
         suggestion = self._optimize_acquisition()
 

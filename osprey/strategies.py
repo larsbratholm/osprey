@@ -513,16 +513,13 @@ class GP(BaseStrategy):
         self._fit_model(X, Y)
         if self.optimize_best:
             x_best = self.get_gp_best()
-            y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
-            self.y_best = self._back_transform_score(y_best)
-            self.x_best = self._from_gp(x_best, searchspace)
         else:
             best_idx = self.model.Y.argmax(axis=0)
             x_best = self.model.X[best_idx].flatten()
-            #y_best = self.model.Y[best_idx].flatten()[0]
-            y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
-            self.y_best = self._back_transform_score(y_best)
-            print("test", y_best, self.model.Y[best_idx].flatten()[0])
+        #y_best = self.model.Y[best_idx].flatten()[0]
+        y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
+        self.y_best = self._back_transform_score(y_best)
+        self.x_best = self._from_gp(x_best, searchspace)
 
         suggestion = self._optimize_acquisition()
 

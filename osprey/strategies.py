@@ -446,6 +446,11 @@ class GP(BaseStrategy):
             raise RuntimeError('strategy/params/acquisition name must be one of '
                                '"ei", "ucb", "osprey", "larsei"')
 
+        if 'params' in self.acquisition_function \
+                and 'kappa' in self.acquisition_function['params']:
+            self.acquisition_function['params']['kappa'] = \
+                    float(self.acquisition_function['params']['kappa'])
+
         f = eval('self._'+self.acquisition_function['name'])
 
         def g(x, y_mean, y_var):
@@ -523,6 +528,7 @@ class GP(BaseStrategy):
                 y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))
             else:
                 y_best = self.model.Y[best_idx].flatten()[0]
+                self.y_best_var = 0
         self.y_best = self._back_transform_score(y_best)
         self.x_best = self._from_gp(x_best, searchspace)
 

@@ -515,6 +515,10 @@ class GP(BaseStrategy):
         self.n_dims = searchspace.n_dims
 
         X, Y, V, ignore = self._get_data(history, searchspace)
+
+        if len(Y) < self.seeds:
+            return RandomSearch().suggest(history, searchspace)
+
         # TODO make _create_kernel accept optional args.
         self._create_kernel()
         self._fit_model(X, Y)

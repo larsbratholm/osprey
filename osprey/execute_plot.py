@@ -28,8 +28,10 @@ def execute(args, parser):
 
     plots = []
     ss = config.search_space()
+    warp = {key:('warp' in value and value['warp'] == 'log') for 
+            key,value in config.__dict__['config']['search_space'].items()}
     for plot in PLOTS:
-        plt = plot(data, ss)
+        plt = plot(data, ss, warp)
         if plt is not None:
             plt = plt if isinstance(plt, list) else [plt]
             plots.extend(plt)

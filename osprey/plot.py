@@ -28,17 +28,31 @@ def nonconstant_parameters(data):
     return filtered
 
 
-def build_scatter_tooltip(x, y, tt, add_line=True, radius=.1, title='My Plot',
-                          xlabel='Iteration number', ylabel='Score'):
-    p = bk.figure(title=title, tools=TOOLS)
+def build_scatter_tooltip(x, y, tt, add_line=True, title='My Plot',
+                          xlabel='Iteration number', ylabel='Score', warp=False):
+    if warp:
+        scale = "log"
+    else:
+        scale = "linear"
+
+    p = bk.figure(title=title, tools=TOOLS, x_axis_type=scale)
+
+    # Small hack to make plots useful even if you have a few
+    # scores that is orders of magnitude worse than the remaining.
+    y = np.asarray(y)
+    if (y < 0).all():
+        median = np.median(y)
+        outliers = np.where(y / median > 1e6)[0]
+        y[outliers] = np.nan
+
 
     tt['x'] = x
     tt['y'] = y
-    tt['radius'] = radius
+    tt['size'] = 10
 
     p.circle(
-        x='x', y='y', radius='radius', source=tt,
-        fill_alpha=0.6, line_color=None)
+        x='x', y='y', size='size', source=tt,
+        fill_alpha=0.6, line_color=None, radius_dimension='y')
 
     if add_line:
         p.line(x, y, line_width=2)
@@ -106,9 +120,9 @@ def plot_3(data, ss, *args):
     df_params['x'] = X[:, 0]
     df_params['y'] = X[:, 1]
     df_params['color'] = mapped_colors
-    df_params['radius'] = 1
+    df_params['size'] = 10
     p.circle(
-        x='x', y='y', color='color', radius='radius',
+        x='x', y='y', color='color', size='size',
         source=ColumnDataSource(data=df_params), fill_alpha=0.6,
         line_color=None)
     cp = p
@@ -122,7 +136,7 @@ def plot_3(data, ss, *args):
     return p
 
 
-def plot_4(data, *args):
+def plot_4(data, ss, warp):
     """Scatter plot of score vs each param
     """
     params = nonconstant_parameters(data)
@@ -137,13 +151,8 @@ def plot_4(data, *args):
         x = params[key][order]
         y = scores[order]
         params = params.loc[order]
-        try:
-            radius = (np.max(x) - np.min(x)) / 100.0
-        except:
-            print("error making plot4 for '%s'" % key)
-            continue
 
         p_list.append(build_scatter_tooltip(
-            x=x, y=y, radius=radius, add_line=False, tt=params,
-            xlabel=key, title='Score vs %s' % key))
+            x=x, y=y, add_line=False, tt=params,
+            xlabel=key, title='Score vs %s' % key, warp=warp[key]))
     return p_list

@@ -370,7 +370,6 @@ class Config(object):
         with open(self.path, 'rb') as f:
             return hashlib.sha1(f.read()).hexdigest()
 
-
 def parse(f):
     res = yaml.load(f)
     if res is None:

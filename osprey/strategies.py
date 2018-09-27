@@ -326,8 +326,12 @@ class GP(BaseStrategy):
         Y_trans = self._transform_score(Y)
 
         model = GPRegression(X, Y_trans, self.kernel)
-        model.optimize_restarts(num_restarts=self.n_init, verbose=False)
-        self.model = model
+        # Catch fitting error
+        try:
+            model.optimize_restarts(num_restarts=self.n_init, verbose=False)
+            self.model = model
+        except np.linalg.linalg.LinAlgError:
+            self.model = None
 
     def _transform_score(self, Y):
         if self.transformed:
@@ -522,6 +526,11 @@ class GP(BaseStrategy):
         # TODO make _create_kernel accept optional args.
         self._create_kernel()
         self._fit_model(X, Y)
+
+        # Catch fitting error
+        if self.model is None:
+            return RandomSearch().suggest(history, searchspace)
+
         if self.optimize_best:
             x_best = self.get_gp_best()
             y_best, self.y_best_var = self.model.predict(x_best.reshape(-1, self.n_dims))

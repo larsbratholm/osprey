@@ -16,6 +16,8 @@ def execute(args, parser):
         print('No Models Found')
     else:
         mean_test_scores = np.nan_to_num(np.array([i["mean_test_score"]
+                                                  if i["mean_test_score"] is not None
+                                                  else -np.inf
                                                   for i in items],
                                                   dtype=float))
         c_b_m = items[mean_test_scores.argmax()]

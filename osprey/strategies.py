@@ -5,7 +5,7 @@ import socket
 
 import numpy as np
 from sklearn.utils import check_random_state
-from sklearn.grid_search import ParameterGrid
+from sklearn.model_selection import ParameterGrid
 import math
 try:
     from hyperopt import (Trials, tpe, fmin, STATUS_OK, STATUS_RUNNING,

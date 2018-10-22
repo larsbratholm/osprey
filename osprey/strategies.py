@@ -384,7 +384,6 @@ class GP(BaseStrategy):
     def get_gp_best(self):
         # Objective function
         def z(x):
-            # TODO make spread of points around x and take mean value.
             X = x.reshape(-1, self.n_dims)
             y_mean, y_var = self.model.predict(X)
 

@@ -132,6 +132,9 @@ class SearchSpace(object):
     def point_to_gp(self, point_dict):
         return [var.point_to_gp(point_dict[var.name]) for var in self]
 
+    def point_from_gp(self, point_list):
+        return {var.name:var.point_from_gp(point_list[i]) for i, var in enumerate(self)}
+
     def __repr__(self):
         lines = (['Hyperparameter search space:'] +
                  ['  ' + repr(var) for var in self])

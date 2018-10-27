@@ -375,7 +375,7 @@ class GP(BaseStrategy):
         return result
 
     def _ucb(self, x, y_mean, y_var, kappa=1.0):
-        result = y_mean + kappa*np.sqrt(y_var)
+        result = y_mean + kappa*np.sqrt(y_var + self.y_best_var)
         return result
 
     def _osprey(self, x, y_mean, y_var):

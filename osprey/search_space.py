@@ -173,7 +173,7 @@ class IntVariable(namedtuple('IntVariable', ('name', 'min', 'max', 'warp'))):
             return (value - self.min) / (self.max - self.min)
         elif self.warp == 'log':
             rng = np.log(self.max) - np.log(self.min)
-            return int((np.log(value) - np.log(self.min)) / rng)
+            return (np.log(value) - np.log(self.min)) / rng
 
         raise ValueError('unknown warp: %s' % self.warp)
 

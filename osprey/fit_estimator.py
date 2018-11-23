@@ -58,7 +58,7 @@ def fit_and_score_estimator(estimator, parameters, cv, X, y=None, scoring=None,
         delayed(_fit_and_score)(clone(estimator), X, y, scorer,
                                 train, test, verbose, parameters,
                                 fit_params=None)
-        for train, test in cv.split(X, y))
+        for train, test in cv.split(X, y, groups=X)) # groups is needed for GroupKFold
 
     assert len(out) == cv.n_splits
 

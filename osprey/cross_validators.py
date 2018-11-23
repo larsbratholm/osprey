@@ -50,6 +50,16 @@ class KFoldFactory(BaseCVFactory):
                                      random_state=self.random_state
                                      )
 
+class GroupKFoldFactory(BaseCVFactory):
+    __doc__ = model_selection.GroupKFold.__doc__
+    short_name = ['groupkfold', 'GroupKFold']
+
+    def __init__(self, n_splits=3):
+        self.n_splits = n_splits
+
+    def create(self, X, y=None):
+        return model_selection.GroupKFold(n_splits=self.n_splits)
+
 
 class LeaveOneOutFactory(BaseCVFactory):
     __doc__ = model_selection.LeaveOneOut.__doc__

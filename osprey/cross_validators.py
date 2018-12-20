@@ -54,11 +54,28 @@ class GroupKFoldFactory(BaseCVFactory):
     __doc__ = model_selection.GroupKFold.__doc__
     short_name = ['groupkfold', 'GroupKFold']
 
-    def __init__(self, n_splits=3):
+    def __init__(self, n_splits=3, group_filename=None):
         self.n_splits = n_splits
+        if group_filename is not None:
+            with open(group_filename) as f:
+                lines = f.readlines()
+
+            self.groups = np.asarray(lines, dtype=int)
+        else:
+            raise SystemExit("GroupKFold needs to be given 'group_filename'")
 
     def create(self, X, y=None):
-        return model_selection.GroupKFold(n_splits=self.n_splits)
+        self.cv_iterator = model_selection.GroupKFold(n_splits=self.n_splits)
+        return self
+
+    # Have to override some methods to make sure
+    # groups are passed to the CV splitter
+    def get_n_split(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+    def split(self, X, y=None, groups=None):
+        assert X.shape[0] == self.groups.size, "Size mismatch in GroupKFold"
+        return self.cv_iterator.split(X,y,groups=self.groups)
 
 
 class LeaveOneOutFactory(BaseCVFactory):

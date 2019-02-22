@@ -362,13 +362,13 @@ class GP(BaseStrategy):
         else:
             return True
 
-    def _ei(self, x, y_mean, y_var):
-        y_std = np.sqrt(y_var)
-        z = (y_mean - self._transform_score(self.y_best))/y_std
-        result = y_std*(z*norm.cdf(z) + norm.pdf(z))
-        return result
+    #def _ei(self, x, y_mean, y_var):
+    #    y_std = np.sqrt(y_var)
+    #    z = (y_mean - self._transform_score(self.y_best))/y_std
+    #    result = y_std*(z*norm.cdf(z) + norm.pdf(z))
+    #    return result
 
-    def _larsei(self, x, y_mean, y_var, kappa=0.01):
+    def _ei(self, x, y_mean, y_var, kappa=0.01):
         y_std = np.sqrt(y_var + self.y_best_var)
         z = (y_mean - self._transform_score(self.y_best) - kappa)/y_std
         result = y_std*(z*norm.cdf(z) + norm.pdf(z))
@@ -445,9 +445,9 @@ class GP(BaseStrategy):
         if sorted(self.acquisition_function.keys()) != ['name', 'params']:
             raise RuntimeError('strategy/params/acquisition must contain keys '
                                '"name" and "params"')
-        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey', 'larsei']:
+        if self.acquisition_function['name'] not in ['ei', 'ucb', 'osprey']:
             raise RuntimeError('strategy/params/acquisition name must be one of '
-                               '"ei", "ucb", "osprey", "larsei"')
+                               '"ei", "ucb", "osprey"')
 
         if 'params' in self.acquisition_function \
                 and 'kappa' in self.acquisition_function['params']:

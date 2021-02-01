@@ -2,7 +2,7 @@ from __future__ import print_function, absolute_import, division
 
 from .trials import Trial
 from .config import Config
-from .plot import plot_1, plot_2, plot_3, plot_4
+from .plot import plot_1, plot_2, plot_3, plot_4, plot_5
 
 try:
     import bokeh.plotting as bk
@@ -13,7 +13,7 @@ except ImportError:
         'version >=0.10.0.\n\n    $ conda install bokeh  # (recommended)\n'
         'or\n    $ pip install bokeh')
 
-PLOTS = [plot_4, plot_1, plot_2, plot_3]
+PLOTS = [plot_4, plot_5, plot_1, plot_2, plot_3]
 
 
 def execute(args, parser):

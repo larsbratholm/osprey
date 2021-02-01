@@ -156,3 +156,78 @@ def plot_4(data, ss, warp):
             x=x, y=y, add_line=False, tt=params,
             xlabel=key, title='Score vs %s' % key, warp=warp[key]))
     return p_list
+
+def plot_5(data, ss, warp):
+    """Correlation plot of the parameters, colored by score
+    """
+
+    #for d in data:
+    #    if d['mean_test_score'] > -8:
+    #        print(d['mean_test_score'], d['elapsed'], d['parameters'])
+
+    scores = np.array([d['mean_test_score'] for d in data])
+    # maps each parameters to a vector of floats
+    warped = np.array([ss.point_to_gp(d['parameters']) for d in data])
+    order = np.argsort(scores)
+
+    e_scores = 1.2**(scores)
+    mine, maxe = np.min(e_scores), np.max(e_scores)
+
+    color = (e_scores - mine) / (maxe - mine)
+    mapped_colors = list(map(rgb2hex, cm.get_cmap('RdBu_r')(color)))
+
+    params = nonconstant_parameters(data)
+    keys = list(params.keys())
+
+    for key in keys:
+        if params[key].dtype == np.dtype('bool'):
+            params[key] = params[key].astype(np.int)
+
+    params = params.loc[order]
+
+    params['score'] = scores[order]
+    params['x'] = None
+    params['y'] = None
+    params['color'] = [mapped_colors[i] for i in order]
+    params['size'] = 10
+
+    params = params[params['score'] > -10]
+
+    p_list = []
+
+    for i, ikey in enumerate(keys):
+        for j, jkey in enumerate(keys):
+            if j <= i:
+                continue
+
+            params['x'] = params[ikey]
+            params['y'] = params[jkey]
+
+            if warp[ikey]:
+                xscale = "log"
+            else:
+                xscale = "linear"
+
+            if warp[jkey]:
+                yscale = "log"
+            else:
+                yscale = "linear"
+
+            p = bk.figure(title="%s vs %s" % (ikey, jkey), tools=TOOLS, x_axis_type=xscale, y_axis_type=yscale)
+
+            p.circle(
+                x='x', y='y', color='color', size='size',
+                source=ColumnDataSource(data=params), fill_alpha=0.6,
+                line_color=None)
+            cp = p
+            hover = cp.select(dict(type=HoverTool))
+            format_tt = [(s, '@%s' % s) for s in params.columns]
+            hover.tooltips = OrderedDict([("index", "$index")] + format_tt)
+
+            xax, yax = p.axis
+            xax.axis_label = ikey
+            yax.axis_label = jkey
+
+            p_list.append(p)
+
+    return p_list
